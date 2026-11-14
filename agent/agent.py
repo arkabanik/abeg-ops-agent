@@ -10,6 +10,7 @@ from langchain_core.messages import ToolMessage
 from cache.llm_cache import configure_llm_cache
 from cache.semantic_cache import configure_semantic_cache
 from cache.semantic_question_cache import QuestionCache
+from guardrails.id_redaction_middleware import IdRedactionAgentMiddleware
 from guardrails.redaction_middleware import RedactionAgentMiddleware
 from guardrails.security_middleware import LLMSecurityMiddleware
 from llm.llm import get_llm, get_security_llm
@@ -46,7 +47,8 @@ async def run():
             LLMSecurityMiddleware(get_security_llm()),
             PIIMiddleware("email", strategy="redact", apply_to_input=True, apply_to_output=True, apply_to_tool_results=True),
             PIIMiddleware("credit_card",strategy="mask", apply_to_input=True, apply_to_output=True, apply_to_tool_results=True),
-            RedactionAgentMiddleware()
+            # RedactionAgentMiddleware()
+            IdRedactionAgentMiddleware()
         ],
         system_prompt = SYSTEM_PROMPT
     )
