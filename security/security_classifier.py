@@ -1,6 +1,5 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 
-import system_prompt
 from security.security_schema import SecurityAssessment
 
 SECURITY_CLASSIFIER_PROMPT = """

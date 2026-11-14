@@ -26,11 +26,11 @@ class IdRedactionAgentMiddleware(AgentMiddleware):
             return placeholder
         return ID_PATTERN.sub(swap, text)
 
-    def reveal(self, text: str) -> str:
+    def reveal(self, text: str) -> str | Any:
         """Replace placeholders with real IDs."""
         def swap(match):
             match_id = match.group(0).upper()
-            return self.notebook[match_id]
+            return self.notebook.get(match_id, match_id)
         return PLACEHOLDER_PATTERN.sub(swap, text)
 
     @staticmethod
@@ -42,7 +42,7 @@ class IdRedactionAgentMiddleware(AgentMiddleware):
             for b in content:
                 if isinstance(b, str):
                     new_list.append(fn(b))
-                elif isinstance(b, dict):
+                elif isinstance(b, dict) and "text" in b:
                     new_list.append({**b, "text":fn(b["text"])})
                 else:
                     new_list.append(b)
@@ -55,16 +55,12 @@ class IdRedactionAgentMiddleware(AgentMiddleware):
         handler: Callable[[ModelRequest[Any]], Awaitable[ModelResponse[Any]]],
     ) -> ModelResponse[Any]:
 
-        # print(f"Request detail inside model call: \n{request}\n\n")
-
-
         messages = [message.model_copy(update ={"content": self.on_content(message.content, self.hide)}) for message in request.messages]
 
         return await handler(request.override(messages=messages))
 
     async def awrap_tool_call(self, request: ToolCallRequest, handler: Callable[[ToolCallRequest], Awaitable[ToolMessage]]):
 
-        # print(f"Request detail inside tool call: \n{request}\n\n")
         new_args = {}
         for key, value in request.tool_call["args"].items():
             if isinstance(value,str):
@@ -81,7 +77,7 @@ class IdRedactionAgentMiddleware(AgentMiddleware):
 
 
     async def aafter_agent(self, state, runtime):
-        print(f"The state message after agent call: \n{state}\n\n")
+
         last_message = state["messages"][-1]
         if isinstance(last_message, AIMessage):
             new_message = last_message.model_copy(update = {
