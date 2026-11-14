@@ -1039,61 +1039,46 @@ CREATE ROLE web_anon NOLOGIN;
 GRANT USAGE ON SCHEMA api TO web_anon;
 
 -- pickup_addresses (identity column is pickup_address_id)
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.pickup_addresses TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.pickup_addresses_pickup_address_id_seq TO web_anon;
+GRANT SELECT ON api.pickup_addresses TO web_anon;
 
 -- vendors
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.vendors TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.vendors__id_seq TO web_anon;
+GRANT SELECT ON api.vendors TO web_anon;
 
 -- vendor_pii
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.vendor_pii TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.vendor_pii__id_seq TO web_anon;
+GRANT SELECT ON api.vendor_pii TO web_anon;
 
 -- customers
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.customers TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.customers__id_seq TO web_anon;
+GRANT SELECT ON api.customers TO web_anon;
 
 -- customer_pii
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.customer_pii TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.customer_pii__id_seq TO web_anon;
+GRANT SELECT ON api.customer_pii TO web_anon;
 
 -- batches
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.batches TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.batches__id_seq TO web_anon;
+GRANT SELECT ON api.batches TO web_anon;
 
 -- products
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.products TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.products__id_seq TO web_anon;
+GRANT SELECT ON api.products TO web_anon;
 
 -- product_media
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.product_media TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.product_media__id_seq TO web_anon;
+GRANT SELECT ON api.product_media TO web_anon;
 
 -- product_item
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.product_item TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.product_item__id_seq TO web_anon;
+GRANT SELECT ON api.product_item TO web_anon;
 
 -- orders
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.orders TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.orders__id_seq TO web_anon;
+GRANT SELECT ON api.orders TO web_anon;
 
 -- order_addresses
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.order_addresses TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.order_addresses__id_seq TO web_anon;
+GRANT SELECT ON api.order_addresses TO web_anon;
 
 -- order_charges
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.order_charges TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.order_charges__id_seq TO web_anon;
+GRANT SELECT ON api.order_charges TO web_anon;
 
 -- order_delivery_details
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.order_delivery_details TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.order_delivery_details__id_seq TO web_anon;
+GRANT SELECT ON api.order_delivery_details TO web_anon;
 
 -- order_items
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.order_items TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.order_items__id_seq TO web_anon;
+GRANT SELECT ON api.order_items TO web_anon;
 
 -- order_payments
-GRANT SELECT, INSERT, UPDATE, DELETE ON api.order_payments TO web_anon;
-GRANT USAGE, SELECT ON SEQUENCE api.order_payments__id_seq TO web_anon;
+GRANT SELECT ON api.order_payments TO web_anon;
