@@ -38,7 +38,7 @@ async def run():
             return
 
     # configure_llm_cache()
-    question_semantic_cache = QuestionCache(0.2, 60)
+    question_semantic_cache = QuestionCache(0.2, 600)
     agent = create_agent(
         model = get_llm(),
         tools = mcp_tools,
@@ -54,13 +54,12 @@ async def run():
 
     def new_conversation():
         return 0, {"configurable": {"thread_id":str(uuid.uuid4())}}
-        pass
 
     turn, config = new_conversation()
     while True:
-        user_query = input("Enter your query (type 'new' to start a new conversation or type 'exit' to quit): ")
+        user_query = input("Enter your query (type 'new' to start a new conversation or type 'exit' to quit): ").strip()
 
-        if user_query.lower() == 'exit' or user_query.lower() == 'quit':
+        if user_query.lower() in ('exit', 'quit'):
             return
 
         if user_query.lower() == 'new':
