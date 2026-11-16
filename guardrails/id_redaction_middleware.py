@@ -1,7 +1,7 @@
 import re
 from typing import Callable, Awaitable, Any
 
-from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse, ExtendedModelResponse
+from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse
 from langchain_core.messages import ToolMessage, AIMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
 
