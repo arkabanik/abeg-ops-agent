@@ -59,7 +59,12 @@ async def run():
         try:
             #Look up cache to check if we have answered anything like this before?
             start_time = time.perf_counter()
-            cached_answer = await question_semantic_cache.get(user_query)
+            try:
+                cached_answer = await question_semantic_cache.get(user_query)
+            except Exception as e:
+                print(f"Cache unavailable, continuing without it: {type(e).__name__}")
+                cached_answer = None
+
             if cached_answer:
                 time_taken = time.perf_counter() - start_time
                 print(f"Time taken to process the query: {time_taken:.2f} seconds")
@@ -79,7 +84,10 @@ async def run():
             tool_used = any(isinstance(m, ToolMessage) for m in response["messages"])
 
             if tool_used and isinstance(result, str) and result.strip():
-                await question_semantic_cache.put(user_query, result)
+                try:
+                    await question_semantic_cache.put(user_query, result)
+                except Exception as e:
+                    print(f"Could not save to cache: {type(e).__name__}")
 
         except Exception as e:
             print(f"Error: {e}")
