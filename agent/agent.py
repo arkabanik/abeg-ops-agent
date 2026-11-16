@@ -1,9 +1,12 @@
 import time
+import uuid
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import PIIMiddleware
 from langchain.mcp import MCPAdapter
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage, HumanMessage, AIMessage
+from langgraph.checkpoint.memory import InMemorySaver
+
 from cache.semantic_question_cache import QuestionCache
 from guardrails.id_redaction_middleware import IdRedactionAgentMiddleware
 from guardrails.security_middleware import LLMSecurityMiddleware
@@ -45,37 +48,49 @@ async def run():
             PIIMiddleware("credit_card",strategy="mask", apply_to_input=True, apply_to_output=True, apply_to_tool_results=True),
             IdRedactionAgentMiddleware()
         ],
-        system_prompt = SYSTEM_PROMPT
+        system_prompt = SYSTEM_PROMPT,
+        checkpointer= InMemorySaver()
     )
 
-    # bot_chain = get_chain(mcp_tools)
+    def new_conversation():
+        return 0, {"configurable": {"thread_id":str(uuid.uuid4())}}
+        pass
 
+    turn, config = new_conversation()
     while True:
-        user_query = input("Enter your query (or type 'exit' to quit): ")
+        user_query = input("Enter your query (type 'new' to start a new conversation or type 'exit' to quit): ")
 
         if user_query.lower() == 'exit' or user_query.lower() == 'quit':
             return
 
+        if user_query.lower() == 'new':
+            turn, config = new_conversation()
+            print("Started a new conversation")
+            continue
+
         try:
             #Look up cache to check if we have answered anything like this before?
             start_time = time.perf_counter()
-            try:
-                cached_answer = await question_semantic_cache.get(user_query)
-            except Exception as e:
-                print(f"Cache unavailable, continuing without it: {type(e).__name__}")
-                cached_answer = None
+            if turn == 0:
+                try:
+                    cached_answer = await question_semantic_cache.get(user_query)
+                except Exception as e:
+                    print(f"Cache unavailable, continuing without it: {type(e).__name__}")
+                    cached_answer = None
 
-            if cached_answer:
-                time_taken = time.perf_counter() - start_time
-                print(f"Time taken to process the query: {time_taken:.2f} seconds")
-                print(f"Response: {cached_answer}")
-                continue
+                if cached_answer:
+                    time_taken = time.perf_counter() - start_time
+                    print(f"Time taken to process the query: {time_taken:.2f} seconds")
+                    print(f"Response: {cached_answer}")
+                    await agent.aupdate_state(config, {"messages": [HumanMessage(user_query), AIMessage(cached_answer)]})
+                    turn += 1
+                    continue
 
             # If no cache hit, run the full agent
             start_time = time.perf_counter()
             response = await agent.ainvoke({"messages": [
                 ("human", user_query)
-            ]})
+            ]}, config=config)
             time_taken = time.perf_counter() - start_time
             print(f"Time taken to process the query: {time_taken:.2f} seconds")
             result = response["messages"][-1].content
@@ -83,12 +98,12 @@ async def run():
 
             tool_used = any(isinstance(m, ToolMessage) for m in response["messages"])
 
-            if tool_used and isinstance(result, str) and result.strip():
+            if turn ==0 and tool_used and isinstance(result, str) and result.strip():
                 try:
                     await question_semantic_cache.put(user_query, result)
                 except Exception as e:
                     print(f"Could not save to cache: {type(e).__name__}")
-
+            turn = turn + 1
         except Exception as e:
             print(f"Error: {e}")
 
