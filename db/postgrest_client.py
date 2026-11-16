@@ -17,7 +17,6 @@ TIMEOUT_SECONDS = 10
 log = logging.getLogger("postgrest_client")
 
 def get_total_from_header(response: httpx.Response) -> int | None:
-    print(f"Response Header: {response.headers}")
     match = re.search(r"/(\d+)$", response.headers.get("content-range", ""))
     return int(match.group(1)) if match else None
 
