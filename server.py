@@ -194,7 +194,7 @@ if __name__ == "__main__":
     mcp.run(
         transport= "http",
         host= os.getenv("MCP_HOST", "127.0.0.1"),  # Binds only to your localhost loopback
-        port= int(os.getenv("MCP_PORT", "9000")),
+        port= int(os.getenv("MCP_PORT", "9001")),
         show_banner= False# Choose an open port
     )
 

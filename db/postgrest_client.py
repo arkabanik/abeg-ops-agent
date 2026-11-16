@@ -36,8 +36,8 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
     limit_capped: bool = False
 
     # Limit the size of the response
-    limit =  max(0,min(limit, MAX_LIMIT))
     limit_capped = limit > MAX_LIMIT
+    limit =  max(0,min(limit, MAX_LIMIT))
     offset = max(0, offset)
 
     params = {**(filters or {}), "select": select_for(model), "limit": limit, "offset": offset}
@@ -78,7 +78,7 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
 
     status_code = response.status_code
     if status_code == 416:
-        return ToolResult(meta= get_meta(returned=0, total_records= get_total_from_header(response)), data=[], status="SUCCESS")
+        return Result(meta= get_meta(returned=0, total_records= get_total_from_header(response)), data=[], status="SUCCESS")
     if status_code in (401, 403):
         return failed(ErrorCode.PERMISSION_DENIED, "Not allowed to read this data")
     if status_code == 400:

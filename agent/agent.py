@@ -17,12 +17,12 @@ async def run():
 
     # Modern MCP Configuration Dictionary Structure
     # Note: Transport key is no longer needed; it is inferred automatically from 'command'
-    print(f"Connecting to local MCP server via stdio transport... {os.getenv('MCP_URL')}")
+    print(f"Connecting to local MCP server via http transport... {os.getenv('MCP_URL')}")
     # Load tools dynamically from the running MCP server
     # This automatically manages the async stdio connection lifetime
     # Use MCPAdapter context manager to automatically start/stop the server
     # async with MCPAdapter(Path(__file__).parent.parent / "server.py") as adapter:
-    async with MCPAdapter(os.getenv("MCP_URL","127.0.0.1:9000/mcp")) as adapter:
+    async with MCPAdapter(os.getenv("MCP_URL","http://127.0.0.1:9000/mcp")) as adapter:
         try:
             # Retrieve tools using the modern API method
             mcp_tools = await adapter.list_tools()
