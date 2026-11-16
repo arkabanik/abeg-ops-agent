@@ -1,5 +1,4 @@
 import time
-from pathlib import Path
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import PIIMiddleware
@@ -9,7 +8,7 @@ from cache.semantic_question_cache import QuestionCache
 from guardrails.id_redaction_middleware import IdRedactionAgentMiddleware
 from guardrails.security_middleware import LLMSecurityMiddleware
 from llm.llm import get_llm, get_security_llm
-from system_prompt import SYSTEM_PROMPT
+from prompts.system_prompt import SYSTEM_PROMPT
 import os
 
 
