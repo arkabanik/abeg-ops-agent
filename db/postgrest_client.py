@@ -21,7 +21,7 @@ def get_total_from_header(response: httpx.Response) -> int | None:
     match = re.search(r"/(\d+)$", response.headers.get("content-range", ""))
     return int(match.group(1)) if match else None
 
-async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["str", "str"], limit: int = 5, offset: int = 0, ) -> ToolResult[Any]:
+async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["str", "str"], limit: int = 5, offset: int = 0, not_found_if_empty: bool = False) -> ToolResult[Any]:
     """
     Fetch rows of model from table, caps the response limit, records the limit_capped to true/false, validates them, wrpas them in ToolResult[model].
     :param: limit
@@ -37,7 +37,7 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
 
     # Limit the size of the response
     limit_capped = limit > MAX_LIMIT
-    limit =  max(0,min(limit, MAX_LIMIT))
+    limit =  max(1,min(limit, MAX_LIMIT))
     offset = max(0, offset)
 
     params = {**(filters or {}), "select": select_for(model), "limit": limit, "offset": offset}
@@ -66,7 +66,6 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
     try:
         async with httpx.AsyncClient(base_url=POSTGREST_URL, timeout=TIMEOUT_SECONDS) as client:
             response = await client.get(f"/{table}", params=params, headers={"Prefer":"count=exact"})
-            # response.raise_for_status()
     except httpx.TimeoutException as e:
         return failed(ErrorCode.TIMEOUT, f"PostgREST did not answer within {TIMEOUT_SECONDS}s")
     except httpx.RequestError as e:
@@ -78,7 +77,7 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
 
     status_code = response.status_code
     if status_code == 416:
-        return Result(meta= get_meta(returned=0, total_records= get_total_from_header(response)), data=[], status="SUCCESS")
+        return Result(meta=get_meta(returned=0, total_records=get_total_from_header(response)), data=[], status="SUCCESS")
     if status_code in (401, 403):
         return failed(ErrorCode.PERMISSION_DENIED, "Not allowed to read this data")
     if status_code == 400:
@@ -92,6 +91,8 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
     except (ValidationError, ValueError) as e:
         return failed(ErrorCode.INVALID_RESPONSE, f"Data from PostgREST did not match the {model.__name__} model")
 
+    if not rows and not_found_if_empty:
+        return failed(error_code=ErrorCode.NOT_FOUND, message= f"Couldn't find {model.__name__.lower()} with the given parameters")
 
     # Return the result
     return Result(meta= get_meta(returned=len(rows), total_records= total), data=rows, status = "SUCCESS")
