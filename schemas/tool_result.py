@@ -17,7 +17,7 @@ class ErrorCode(str, Enum):
     TIMEOUT = "TIMEOUT"                      # PostgREST took too long
     INVALID_RESPONSE = "INVALID_RESPONSE"    # data did not match the expected model
 
-# RETRYABLE = {ErrorCode.UNAVAILABLE, ErrorCode.TIMEOUT, ErrorCode.UPSTREAM_ERROR}
+RETRYABLE = {ErrorCode.UNAVAILABLE, ErrorCode.TIMEOUT, ErrorCode.UPSTREAM_ERROR}
 
 class ToolMeta(BaseModel):
     tool: str
@@ -42,7 +42,7 @@ class ToolError(BaseModel):
 class ToolResult(BaseModel, Generic[T]):
     meta: ToolMeta
     data: list[T] = Field(default_factory=list)
-    error: ToolError | None
+    error: ToolError | None = None
     status: Literal["SUCCESS", "FAILED"]
 
 

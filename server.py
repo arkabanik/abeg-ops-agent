@@ -1,6 +1,7 @@
 from fastmcp import FastMCP
 import httpx
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
@@ -191,9 +192,10 @@ if __name__ == "__main__":
     print("Correctly configured PostgREST Customer MCP Server is running.")
     # mcp.run(transport="stdio")
     mcp.run(
-        # transport="sse",
-        # host="127.0.0.1",  # Binds only to your localhost loopback
-        # port=8000,         # Choose an open port
+        transport= "http",
+        host= os.getenv("MCP_HOST", "127.0.0.1"),  # Binds only to your localhost loopback
+        port= int(os.getenv("MCP_PORT", "9000")),
+        show_banner= False# Choose an open port
     )
 
 

@@ -9,7 +9,7 @@ import httpx
 from pydantic import BaseModel, ValidationError, TypeAdapter
 
 from schemas.records import select_for
-from schemas.tool_result import ToolResult, MAX_LIMIT, ErrorCode, ToolError, ToolMeta
+from schemas.tool_result import ToolResult, MAX_LIMIT, ErrorCode, ToolError, ToolMeta, RETRYABLE
 
 POSTGREST_URL = os.getenv("POSTGREST_URL", "http://localhost:3000")
 TIMEOUT_SECONDS = 10
@@ -21,7 +21,7 @@ def get_total_from_header(response: httpx.Response) -> int | None:
     match = re.search(r"/(\d+)$", response.headers.get("content-range", ""))
     return int(match.group(1)) if match else None
 
-async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["str", "str"], lim: int = 5, offset: int = 0, ) -> ToolResult[Any]:
+async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["str", "str"], limit: int = 5, offset: int = 0, ) -> ToolResult[Any]:
     """
     Fetch rows of model from table, caps the response limit, records the limit_capped to true/false, validates them, wrpas them in ToolResult[model].
     :param: limit
@@ -36,16 +36,9 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
     limit_capped: bool = False
 
     # Limit the size of the response
-    limit =  min(lim, MAX_LIMIT)
-    if limit < lim:
-        limit_capped = True
+    limit =  max(0,min(limit, MAX_LIMIT))
+    limit_capped = limit > MAX_LIMIT
     offset = max(0, offset)
-
-    param = {
-        "limit":0,
-        "offset":0,
-        "select": "*",
-    }
 
     params = {**(filters or {}), "select": select_for(model), "limit": limit, "offset": offset}
 
@@ -67,7 +60,7 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
 
     def failed(error_code: ErrorCode, message: str):
         log.error(f"Error occurred: {message}")
-        return ToolResult(meta=get_meta(), error=ToolError(code=error_code, message=message, retryable= error_code in ErrorCode ), status="FAILED")
+        return Result(meta=get_meta(), error=ToolError(code=error_code, message=message, retryable= error_code in RETRYABLE ), status="FAILED")
 
     #Call PostgREST
     try:
@@ -79,13 +72,13 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
     except httpx.RequestError as e:
         return failed(ErrorCode.UNAVAILABLE, "Could not connect to PostgREST")
 
-    duration = int(time.perf_counter() - start_time)
+    duration = round((time.perf_counter() - start_time) * 1000)
     fetched_at = datetime.now(timezone.utc)
     total = get_total_from_header(response)
 
     status_code = response.status_code
-    if status_code in (416):
-        return ToolResult(meta= get_meta(returned=0, total_records= get_total_from_header(response)), data=[], error=None, status="SUCCESS")
+    if status_code == 416:
+        return ToolResult(meta= get_meta(returned=0, total_records= get_total_from_header(response)), data=[], status="SUCCESS")
     if status_code in (401, 403):
         return failed(ErrorCode.PERMISSION_DENIED, "Not allowed to read this data")
     if status_code == 400:
@@ -96,8 +89,9 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
     # validate every row against the given model
     try:
         rows = TypeAdapter(list[model]).validate_python(response.json())
-    except ValidationError as e:
+    except (ValidationError, ValueError) as e:
         return failed(ErrorCode.INVALID_RESPONSE, f"Data from PostgREST did not match the {model.__name__} model")
 
+
     # Return the result
-    return Result(meta= get_meta(returned=len(rows), total_records= total), data=rows, error= None, status = "SUCCESS")
+    return Result(meta= get_meta(returned=len(rows), total_records= total), data=rows, status = "SUCCESS")

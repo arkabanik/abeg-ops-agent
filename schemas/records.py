@@ -12,7 +12,7 @@ class Sensitivity(str, Enum):
     NONE = "none"
 
 def field(sensitivity: Sensitivity = Sensitivity.NONE, **kwargs):
-    return Field(json_schema_extra={"s-sensitibity": sensitivity}, **kwargs)
+    return Field(json_schema_extra={"x-sensitivity": sensitivity.value}, **kwargs)
 
 class Record(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -58,7 +58,7 @@ def select_for(model: type[BaseModel]) -> str:
         inner = args[0] if args else None
         if isinstance(inner, type) and issubclass(inner, Record):
             parts.append(f"{name}({select_for(inner)})")
-        else:   
+        else:
             parts.append(name)
     return ",".join(parts)
 
