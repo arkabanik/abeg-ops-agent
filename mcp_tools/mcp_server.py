@@ -1,6 +1,7 @@
 from typing import Annotated
-
+from dotenv import load_dotenv
 import os
+load_dotenv()
 
 from fastmcp import FastMCP
 from pydantic import Field
