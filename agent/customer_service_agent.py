@@ -15,7 +15,7 @@ from guardrails.security_middleware import LLMSecurityMiddleware
 from llm.llm import get_llm, get_security_llm
 from prompts.system_prompt import SYSTEM_PROMPT
 import os
-from schemas.agent_result import AgentResult, AgentRunMeta, AgentRunOutput, Source, ToolCallInfo
+from schemas.agent_result import AgentResult, AgentRunMeta, AgentRunOutput, Source, ToolCallInfo, Status
 from schemas.records import Order, Customer, sensitive_fields, Sensitivity
 
 
@@ -63,8 +63,8 @@ async def run():
 
         return None
 
-    def _status(final_message: BaseMessage | None, tool_calls: list[ToolCallInfo]) -> Outcome:
-        if final_message is None:
+    def _status(message: BaseMessage | None, tool_calls: list[ToolCallInfo]) -> Status:
+        if message is None:
             return "FAILED"
         for toolcall in reversed(tool_calls):
             if toolcall.status == "FAILED":
@@ -99,7 +99,7 @@ async def run():
             )
         )
 
-    def build_agent_result(*, output_messages, usage, thread_id: str, turn: int, source:Source, started_at: datetime, started: float):
+    def build_agent_result(*, output_messages: list[BaseMessage], usage, t_id: str, t: int, source:Source, start_at: datetime, start: float):
         print("inside Build agent result")
         tool_list: list[ToolCallInfo] = []
         print(f"Usage: {usage}")
@@ -114,7 +114,6 @@ async def run():
             if tool_payload:
                 meta = tool_payload.get("meta", {})
                 data = tool_payload.get("data", [])
-                error = tool_payload.get("error", {})
                 status = tool_payload.get("status", "FAILED")
 
                 tool_list.append(ToolCallInfo(tool_id=message.tool_call_id,
@@ -127,22 +126,22 @@ async def run():
                                               status=status,))
 
         # Capture the final message to retrieve the output
-        final_message: AIMessage | None
+        last_message: AIMessage | None = None
         for message in reversed(output_messages):
             if isinstance(message, AIMessage):
-                final_message = message
+                last_message = message
                 break
-        text = final_message.content if final_message is not None and isinstance(final_message.content, str) else ""
-        status = _status(final_message=final_message, tool_calls=tool_list)
+        text = last_message.content if last_message is not None and isinstance(last_message.content, str) else ""
+        status = _status(message=last_message, tool_calls=tool_list)
         record_ids = _ids(data)
         return AgentResult(
             agent_meta=AgentRunMeta(
                 run_id=run_id,
-                thread_id=thread_id,
-                turn=turn,
-                source="agent",
-                started_at=started_at,
-                duration_ms=int((time.perf_counter() - started) * 1000),
+                thread_id=t_id,
+                turn=t,
+                source=source,
+                started_at=start_at,
+                duration_ms=int((time.perf_counter() - start) * 1000),
                 tools=tool_list,
                 usage_by_model=usage,
                 total_token=sum(u.total_tokens for u in usage.values())
@@ -195,9 +194,6 @@ async def run():
                     cached_answer = None
 
                 if cached_answer:
-                    time_taken = time.perf_counter() - start_time
-                    # print(f"Time taken to process the query: {time_taken:.2f} seconds")
-                    # print(f"Response: {cached_answer}")
                     agent_run_result = build_cached_result(output=cached_answer, t_id=thread_id, t=turn, source="cache", start_at=started_at, start=started)
                     await agent.aupdate_state(config, {"messages": [HumanMessage(user_query), AIMessage(cached_answer)]})
                     turn += 1
@@ -211,7 +207,7 @@ async def run():
                 ]}, config=config)
 
             before = len((await agent.aget_state(config=config)).values.get("messages", []))
-            build_agent_result(output_messages=response["messages"][before:], usage=usage.usage_metadata, thread_id=thread_id, turn=turn, source="agent", started_at=started_at, started=started)
+            agent_run_result = build_agent_result(output_messages=response["messages"][before:], usage=usage.usage_metadata, t_id=thread_id, t=turn, source="agent", start_at=started_at, start=started)
 
             time_taken = time.perf_counter() - start_time
             print(f"Time taken to process the query: {time_taken:.2f} seconds")
