@@ -109,7 +109,6 @@ async def run():
     def build_agent_result(*, output_messages: list[BaseMessage], usage_meta: dict, t_id: str, t: int, source:Source, start_at: datetime, start: float):
         print("inside Build agent result")
         tool_list: list[ToolCallInfo] = []
-        print(f"Usage Meta: {usage_meta}")
         data = []
         # Gather tool call info for each tool call
         for message in output_messages:
@@ -210,19 +209,20 @@ async def run():
                     continue
 
             # If no cache hit, run the full agent
-            start_time = time.perf_counter()
+            # start_time = time.perf_counter()
+            before = len((await agent.aget_state(config=config)).values.get("messages", []))
             with get_usage_metadata_callback() as usage:
                 response = await agent.ainvoke({"messages": [
                     ("human", user_query)
                 ]}, config=config)
 
-            before = len((await agent.aget_state(config=config)).values.get("messages", []))
             agent_run_result = build_agent_result(output_messages=response["messages"][before:], usage_meta=usage.usage_metadata, t_id=thread_id, t=turn, source="agent", start_at=started_at, start=started)
 
-            time_taken = time.perf_counter() - start_time
-            print(f"Time taken to process the query: {time_taken:.2f} seconds")
+            print(f"\n\nAgent Result: {agent_run_result}")
+            # time_taken = time.perf_counter() - start_time
+            # print(f"Time taken to process the query: {time_taken:.2f} seconds")
             result = response["messages"][-1].content
-            print(f"Response: {result}")
+            print(f"\n\nResponse: {result}")
 
             tool_used = any(isinstance(m, ToolMessage) for m in response["messages"])
 
