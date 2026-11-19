@@ -15,7 +15,7 @@ from guardrails.security_middleware import LLMSecurityMiddleware
 from llm.llm import get_llm, get_security_llm
 from prompts.system_prompt import SYSTEM_PROMPT
 import os
-from schemas.agent_result import AgentResult, AgentRunMeta, AgentRunOutput, Source, ToolCallInfo, Status
+from schemas.agent_result import AgentResult, AgentRunMeta, AgentRunOutput, Source, ToolCallInfo, Status, TokenUsageInfo
 from schemas.records import Order, Customer, sensitive_fields, Sensitivity
 
 
@@ -82,6 +82,13 @@ async def run():
                         ids.extend(_ids(v) for v in value)
         return ids
 
+    def _usage_by_model(usage_meta: dict) -> dict[str,TokenUsageInfo]:
+        usage_token_by_model: dict[str, TokenUsageInfo] = {}
+        for key, value in usage_meta.items():
+            if isinstance(value, dict):
+                usage_token_by_model[key] = TokenUsageInfo(input_tokens=value.get("input_tokens", 0), output_tokens=value.get("output_tokens", 0), total_tokens=value.get("total_tokens", 0))
+        return usage_token_by_model
+
     def build_cached_result(*, output: str, t_id: str, t: int, source:Source, start_at: datetime, start: float):
         print("inside Build cache result")
         return AgentResult(
@@ -99,10 +106,10 @@ async def run():
             )
         )
 
-    def build_agent_result(*, output_messages: list[BaseMessage], usage, t_id: str, t: int, source:Source, start_at: datetime, start: float):
+    def build_agent_result(*, output_messages: list[BaseMessage], usage_meta: dict, t_id: str, t: int, source:Source, start_at: datetime, start: float):
         print("inside Build agent result")
         tool_list: list[ToolCallInfo] = []
-        print(f"Usage: {usage}")
+        print(f"Usage Meta: {usage_meta}")
         data = []
         # Gather tool call info for each tool call
         for message in output_messages:
@@ -134,6 +141,9 @@ async def run():
         text = last_message.content if last_message is not None and isinstance(last_message.content, str) else ""
         status = _status(message=last_message, tool_calls=tool_list)
         record_ids = _ids(data)
+
+
+
         return AgentResult(
             agent_meta=AgentRunMeta(
                 run_id=run_id,
@@ -143,8 +153,8 @@ async def run():
                 started_at=start_at,
                 duration_ms=int((time.perf_counter() - start) * 1000),
                 tools=tool_list,
-                usage_by_model=usage,
-                total_token=sum(u.total_tokens for u in usage.values())
+                usage_by_model=_usage_by_model(usage_meta),
+                total_token=sum(value.total_tokens for key, value in _usage_by_model(usage_meta).items())
             ),
             agent_output=AgentRunOutput(
                 output=text,
@@ -207,7 +217,7 @@ async def run():
                 ]}, config=config)
 
             before = len((await agent.aget_state(config=config)).values.get("messages", []))
-            agent_run_result = build_agent_result(output_messages=response["messages"][before:], usage=usage.usage_metadata, t_id=thread_id, t=turn, source="agent", start_at=started_at, start=started)
+            agent_run_result = build_agent_result(output_messages=response["messages"][before:], usage_meta=usage.usage_metadata, t_id=thread_id, t=turn, source="agent", start_at=started_at, start=started)
 
             time_taken = time.perf_counter() - start_time
             print(f"Time taken to process the query: {time_taken:.2f} seconds")
