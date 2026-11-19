@@ -10,6 +10,7 @@ class LLMSecurityMiddleware(AgentMiddleware):
         super().__init__()
         self.classifier = LLMSecurityClassifier(security_model)
 
+    @staticmethod
     def extract_text(self, message: BaseMessage) -> str:
         # print(f"Human message: {message}")
 
@@ -18,11 +19,6 @@ class LLMSecurityMiddleware(AgentMiddleware):
 
         if isinstance(content, str):
             return content
-
-        else:
-            # print("Extracted last human message content is not text. Handle it in the code.")
-            pass
-
 
         return ""
 
@@ -50,27 +46,28 @@ class LLMSecurityMiddleware(AgentMiddleware):
             # read the assessment and pass the request accordingly
             if security_assessment.prompt_injection:
                 return AIMessage(
-                    content="""Smart ass. I cannot process instructions that attempts to override system instructions
-                    or bypass my security policies"""
+                    content="Smart ass. I cannot process instructions that attempts to override system instructions or bypass my security policies",
+                    response_header = {"security_block": "prompt_injection"}
                 )
 
             if security_assessment.harmful_content:
                 if security_assessment.action == "block":
                     return AIMessage(
-                        content="""I cannot process this request
-                        as it involves potentially unauthorised or harmful request"""
+                        content="I cannot process this request as it involves potentially unauthorised or harmful request",
+                        response_header = {"security_block": "harmful_content"}
                     )
 
                 if security_assessment.action == "review":
                     return AIMessage(
-                        content="Need additional human review before proceeding with this request"
+                        content="Need additional human review before proceeding with this request",
+                        response_header = {"security_block": "harmful_review"}
                     )
 
             if security_assessment.out_of_scope:
                 if security_assessment.action == "block":
                     return AIMessage(
-                        content="""I cannot process this request
-                    as it involves potentially unauthorised or harmful request"""
+                        content="I cannot process this request as it involves potentially unauthorised or harmful request",
+                        response_header = {"security_block": "out_of_scope"}
                     )
 
             # Pass legitimate requests

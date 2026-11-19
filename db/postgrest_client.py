@@ -46,7 +46,7 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
     duration: int = 0
     def get_meta(returned: int = 0, total_records: int | None = None):
         return ToolMeta(
-            tool= tool,
+            tool_name= tool,
             fetched_at= fetched_at,
             duration_ms= duration,
             limit= limit,

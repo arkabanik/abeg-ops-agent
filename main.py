@@ -2,7 +2,7 @@ import asyncio
 import os
 from dotenv import load_dotenv
 
-from agent.agent import run
+from agent.customer_service_agent import run
 from config.config import Config
 
 load_dotenv()

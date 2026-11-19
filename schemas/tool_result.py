@@ -4,7 +4,7 @@ from typing import TypeVar, Literal, Generic
 
 from pydantic import BaseModel, Field
 
-SCHEMA_VERSION = "1.0"
+TOOL_SCHEMA_VERSION = "1.0"
 MAX_LIMIT = 10
 T = TypeVar("T")
 
@@ -20,8 +20,9 @@ class ErrorCode(str, Enum):
 RETRYABLE = {ErrorCode.UNAVAILABLE, ErrorCode.TIMEOUT, ErrorCode.UPSTREAM_ERROR}
 
 class ToolMeta(BaseModel):
-    tool: str
-    schema_version: str = SCHEMA_VERSION
+    tool_id: str
+    tool_name: str
+    schema_version: str = TOOL_SCHEMA_VERSION
     fetched_at: datetime
     duration_ms: int
     limit: int
