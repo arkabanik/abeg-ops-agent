@@ -1,8 +1,6 @@
-import json
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Literal
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import PIIMiddleware
@@ -17,7 +15,7 @@ from guardrails.security_middleware import LLMSecurityMiddleware
 from llm.llm import get_llm, get_security_llm
 from prompts.system_prompt import SYSTEM_PROMPT
 import os
-from schemas.agent_result import AgentResult, AgentRunMeta, AgentRunOutput, Source, ToolCallInfo, Outcome
+from schemas.agent_result import AgentResult, AgentRunMeta, AgentRunOutput, Source, ToolCallInfo
 from schemas.records import Order, Customer, sensitive_fields, Sensitivity
 
 
@@ -213,7 +211,7 @@ async def run():
                 ]}, config=config)
 
             before = len((await agent.aget_state(config=config)).values.get("messages", []))
-            build_agent_result(output_messages=response["messages"], usage=usage.usage_metadata, thread_id=thread_id, turn=turn, source="agent", started_at=started_at, started=started)
+            build_agent_result(output_messages=response["messages"][before:], usage=usage.usage_metadata, thread_id=thread_id, turn=turn, source="agent", started_at=started_at, started=started)
 
             time_taken = time.perf_counter() - start_time
             print(f"Time taken to process the query: {time_taken:.2f} seconds")

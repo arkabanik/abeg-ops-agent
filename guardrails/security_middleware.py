@@ -11,7 +11,7 @@ class LLMSecurityMiddleware(AgentMiddleware):
         self.classifier = LLMSecurityClassifier(security_model)
 
     @staticmethod
-    def extract_text(self, message: BaseMessage) -> str:
+    def extract_text(message: BaseMessage) -> str:
         # print(f"Human message: {message}")
 
         content = message.content
@@ -47,7 +47,7 @@ class LLMSecurityMiddleware(AgentMiddleware):
             if security_assessment.prompt_injection:
                 return AIMessage(
                     content="Smart ass. I cannot process instructions that attempts to override system instructions or bypass my security policies",
-                    response_header = {"security_block": "prompt_injection"}
+                    response_metadata = {"security_block": "prompt_injection"}
                 )
 
             if security_assessment.harmful_content:

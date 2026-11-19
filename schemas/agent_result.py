@@ -33,9 +33,8 @@ class AgentRunMeta(BaseModel):
     started_at: datetime
     duration_ms: int
     tools: list[ToolCallInfo] = Field(default_factory=list)
-    usage_by_model: dict[str, TokenUsageInfo] = Field(default_factory=list)
+    usage_by_model: dict[str, TokenUsageInfo] = Field(default_factory=dict)
     total_token: int = 0
-    pass
 
 class AgentRunOutput(BaseModel):
     output: str | None
