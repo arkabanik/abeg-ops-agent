@@ -1,7 +1,7 @@
 [project]
 name = "abeg-ops-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "ABEG internal ops assistant: LangChain agent with MCP tools over PostgREST, ID tokenisation and a semantic cache"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

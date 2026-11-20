@@ -41,7 +41,7 @@ async def fetch(
     :return: ToolResult[model]
     """
 
-    Result = ToolResult[model]
+    Result = ToolResult[model]  # type: ignore[valid-type]
     limit_capped: bool = False
 
     # Limit the size of the response
@@ -49,7 +49,7 @@ async def fetch(
     limit = max(1, min(limit, MAX_LIMIT))
     offset = max(0, offset)
 
-    params = {**(filters or {}), "select": select_for(model), "limit": limit, "offset": offset}
+    params: dict[str, str | int] = {**(filters or {}), "select": select_for(model), "limit": limit, "offset": offset}
 
     fetched_at = datetime.now(timezone.utc)
     start_time = time.perf_counter()
@@ -103,7 +103,7 @@ async def fetch(
 
     # validate every row against the given model
     try:
-        rows = TypeAdapter(list[model]).validate_python(response.json())
+        rows = TypeAdapter(list[model]).validate_python(response.json())  # type: ignore[valid-type]
     except (ValidationError, ValueError):
         return failed(ErrorCode.INVALID_RESPONSE, f"Data from PostgREST did not match the {model.__name__} model")
 

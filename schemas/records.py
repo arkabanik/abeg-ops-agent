@@ -79,9 +79,10 @@ def select_for(model: type[BaseModel]) -> str:
 
 def sensitive_fields(model: type[BaseModel]) -> dict[str, str]:
     """{field_name: sensitivity} for every tagged field, including embedded records."""
-    out = {}
+    out: dict[str, str] = {}
     for name, info in model.model_fields.items():
-        tag = (info.json_schema_extra or {}).get("x-sensitivity", "none")
+        extra = info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
+        tag = str(extra.get("x-sensitivity", "none"))
         if tag != "none":
             out[name] = tag
         args = getattr(info.annotation, "__args__", ())

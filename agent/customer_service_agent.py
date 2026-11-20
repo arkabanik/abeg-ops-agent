@@ -234,7 +234,7 @@ async def run():
             # If no cache hit, run the full agent
             before = len((await agent.aget_state(config=config)).values.get("messages", []))
             with get_usage_metadata_callback() as usage:
-                response = await agent.ainvoke({"messages": [("human", user_query)]}, config=config)
+                response = await agent.ainvoke({"messages": [HumanMessage(user_query)]}, config=config)
 
             agent_run_result = build_agent_result(
                 output_messages=response["messages"][before:],

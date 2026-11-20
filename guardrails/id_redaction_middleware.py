@@ -4,6 +4,7 @@ from typing import Any, Awaitable, Callable
 from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse
 from langchain_core.messages import AIMessage, ToolMessage
 from langgraph.prebuilt.tool_node import ToolCallRequest
+from langgraph.types import Command
 
 ID_PATTERN = re.compile(r"\bCUS\d{4,12}\b", re.IGNORECASE)  # real IDs:     CUS00017
 PLACEHOLDER_PATTERN = re.compile(r"\bCUSTOMER_\d+\b")  # placeholders: CUSTOMER_1
@@ -68,8 +69,8 @@ class IdRedactionAgentMiddleware(AgentMiddleware):
         return await handler(request.override(messages=messages))
 
     async def awrap_tool_call(
-        self, request: ToolCallRequest, handler: Callable[[ToolCallRequest], Awaitable[ToolMessage]]
-    ):
+        self, request: ToolCallRequest, handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]]
+    ) -> ToolMessage | Command[Any]:
 
         new_args = {}
         for key, value in request.tool_call["args"].items():

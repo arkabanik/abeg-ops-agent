@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, Awaitable, Callable
 
 from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse
@@ -23,7 +24,7 @@ class LLMSecurityMiddleware(AgentMiddleware):
 
         return ""
 
-    def extract_latest_human_message(self, messages: list[BaseMessage]) -> str:
+    def extract_latest_human_message(self, messages: Sequence[BaseMessage]) -> str:
 
         for message in reversed(messages):
             if isinstance(message, HumanMessage):
