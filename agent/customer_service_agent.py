@@ -53,14 +53,14 @@ async def run():
             if tag == Sensitivity.IDENTIFIER.value:
                 ID_FIELDS.add(name)
 
-    def _tool_payload(message: ToolMessage) -> dict | None:
+    def _tool_payload(message: ToolMessage) -> dict:
 
         artifact = message.artifact
         if artifact and isinstance(artifact, dict):
             if artifact["structured_content"] and isinstance(artifact["structured_content"], dict):
                 return artifact["structured_content"]
 
-        return None
+        return {}
 
     def _status(message: BaseMessage | None, tool_calls: list[ToolCallInfo]) -> Status:
         if message is None:
@@ -77,8 +77,8 @@ async def run():
                 if field in ID_FIELDS:
                     if isinstance(field, str):
                         ids.append(value)
-                    if isinstance(field, list):
-                        ids.extend(_ids(v) for v in value)
+                    # if isinstance(value, list):
+                    #     ids.extend(_ids(v) for v in value)
         return ids
 
     def _usage_by_model(usage_meta: dict) -> dict[str,TokenUsageInfo]:
@@ -106,12 +106,13 @@ async def run():
         )
 
     def build_agent_result(*, output_messages: list[BaseMessage], usage_meta: dict, t_id: str, t: int, source:Source, start_at: datetime, start: float):
-        print("inside Build agent result")
+        # print("inside Build agent result")
         tool_list: list[ToolCallInfo] = []
         data = []
         # Gather tool call info for each tool call
+        tool_payload: dict = {}
         for message in output_messages:
-            print(f"Reading {type(message)}")
+            # print(f"Reading {type(message)}")
             if not isinstance(message, ToolMessage):
                 continue
 
@@ -132,13 +133,15 @@ async def run():
 
         # Capture the final message to retrieve the output
         last_message: AIMessage | None = None
+        record_ids: list[str] = []
         for message in reversed(output_messages):
             if isinstance(message, AIMessage):
                 last_message = message
                 break
+            record_ids.extend(_ids(tool_payload.get("data") or []))
         text = last_message.content if last_message is not None and isinstance(last_message.content, str) else ""
         status = _status(message=last_message, tool_calls=tool_list)
-        record_ids = _ids(data)
+        # record_ids = _ids(data)
 
 
 
