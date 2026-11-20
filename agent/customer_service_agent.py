@@ -21,7 +21,6 @@ from schemas.records import Order, Customer, sensitive_fields, Sensitivity
 
 async def run():
 
-    run_id=str(uuid.uuid4())
     # Modern MCP Configuration Dictionary Structure
     # Note: Transport key is no longer needed; it is inferred automatically from 'command'
     print(f"Connecting to local MCP server via http transport... {os.getenv('MCP_URL')}")
@@ -93,7 +92,7 @@ async def run():
         print("inside Build cache result")
         return AgentResult(
             agent_meta=AgentRunMeta(
-                run_id=run_id,
+                run_id=str(uuid.uuid4()),
                 thread_id=t_id,
                 turn=t,
                 source=source,
@@ -125,7 +124,7 @@ async def run():
                 tool_list.append(ToolCallInfo(tool_id=message.tool_call_id,
                                               tool_name=meta.get("tool_name",""),
                                               duration_ms=meta.get("duration_ms", 0),
-                                              error_code=meta.get("error_code", ""),
+                                              error_code=(tool_payload.get("error") or {}).get("code"),
                                               returned=meta.get("returned", ""),
                                               total=meta.get("total", 0),
                                               has_more=meta.get("has_more", False),
@@ -145,7 +144,7 @@ async def run():
 
         return AgentResult(
             agent_meta=AgentRunMeta(
-                run_id=run_id,
+                run_id=str(uuid.uuid4()),
                 thread_id=t_id,
                 turn=t,
                 source=source,
@@ -163,6 +162,12 @@ async def run():
             )
         )
 
+    def show(result: AgentResult) -> None:
+        out, meta = result.agent_output, result.agent_meta
+        tools = ", ".join(t.tool_name or "?" for t in meta.tools) or "none"
+        print(f"\nResponse: {out.output}")
+        print(f"[{out.status} · {meta.source} · {meta.duration_ms} ms · {meta.total_token} tokens · tools: {tools}]")
+
     question_semantic_cache = QuestionCache(0.2, 600)
     agent = create_agent(
         model = get_llm(),
@@ -177,9 +182,9 @@ async def run():
         checkpointer= InMemorySaver()
     )
 
-    started_at, started = datetime.now(timezone.utc), time.perf_counter()
+
     turn, config = new_conversation()
-    thread_id = config["configurable"]["thread_id"]
+
     while True:
         user_query = input("Enter your query (type 'new' to start a new conversation or type 'exit' to quit): ").strip()
 
@@ -193,7 +198,8 @@ async def run():
 
         try:
             #Look up cache to check if we have answered anything like this before?
-            start_time = time.perf_counter()
+            started_at, started = datetime.now(timezone.utc), time.perf_counter()
+            thread_id = config["configurable"]["thread_id"]
             cached_answer: str | None = None
             if turn == 0:
                 try:
@@ -204,12 +210,12 @@ async def run():
 
                 if cached_answer:
                     agent_run_result = build_cached_result(output=cached_answer, t_id=thread_id, t=turn, source="cache", start_at=started_at, start=started)
+                    show(agent_run_result)                      # ← add
                     await agent.aupdate_state(config, {"messages": [HumanMessage(user_query), AIMessage(cached_answer)]})
                     turn += 1
                     continue
 
             # If no cache hit, run the full agent
-            # start_time = time.perf_counter()
             before = len((await agent.aget_state(config=config)).values.get("messages", []))
             with get_usage_metadata_callback() as usage:
                 response = await agent.ainvoke({"messages": [
@@ -218,17 +224,12 @@ async def run():
 
             agent_run_result = build_agent_result(output_messages=response["messages"][before:], usage_meta=usage.usage_metadata, t_id=thread_id, t=turn, source="agent", start_at=started_at, start=started)
 
-            print(f"\n\nAgent Result: {agent_run_result}")
-            # time_taken = time.perf_counter() - start_time
-            # print(f"Time taken to process the query: {time_taken:.2f} seconds")
-            result = response["messages"][-1].content
-            print(f"\n\nResponse: {result}")
-
-            tool_used = any(isinstance(m, ToolMessage) for m in response["messages"])
-
-            if turn ==0 and tool_used and isinstance(result, str) and result.strip():
+            show(agent_run_result)
+            output = agent_run_result.agent_output
+            found_rows = any((t.returned or 0) > 0 for t in agent_run_result.agent_meta.tools)
+            if turn == 0 and output.status == "SUCCESS" and found_rows:
                 try:
-                    await question_semantic_cache.put(user_query, result)
+                    await question_semantic_cache.put(user_query, output.output)
                 except Exception as e:
                     print(f"Could not save to cache: {type(e).__name__}")
             turn = turn + 1
