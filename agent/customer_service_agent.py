@@ -114,7 +114,7 @@ async def run():
             tool_payload = _tool_payload(message)
             if tool_payload:
                 meta = tool_payload.get("meta", {})
-                record_ids.extend(_ids(tool_payload.get("data") or []))   # ← replaces  data = ...
+                record_ids.extend(_ids(tool_payload.get("data") or []))
                 status = tool_payload.get("status", "FAILED")
                 tool_list.append(ToolCallInfo(tool_id=message.tool_call_id or None,
                                               tool_name=meta.get("tool_name",""),
@@ -149,7 +149,7 @@ async def run():
             agent_output=AgentRunOutput(
                 output=text,
                 status=status,
-                record_ids=record_ids,
+                record_ids=list(dict.fromkeys(record_ids)),
                 has_more=any(t.has_more for t in tool_list)
             )
         )

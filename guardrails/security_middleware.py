@@ -45,7 +45,7 @@ class LLMSecurityMiddleware(AgentMiddleware):
             # read the assessment and pass the request accordingly
             if security_assessment.prompt_injection:
                 return AIMessage(
-                    content="Smart ass. I cannot process instructions that attempts to override system instructions or bypass my security policies",
+                    content="I can't follow instructions that try to change my rules or bypass security checks.",
                     response_metadata = {"security_block": "prompt_injection"}
                 )
 
