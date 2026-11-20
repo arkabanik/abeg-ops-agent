@@ -44,9 +44,8 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
     fetched_at = datetime.now(timezone.utc)
     start_time = time.perf_counter()
     duration: int = 0
-    def get_meta(tool_id: str = "NA", returned: int = 0, total_records: int | None = None):
+    def get_meta(returned: int = 0, total_records: int | None = None):
         return ToolMeta(
-            tool_id = tool_id,
             tool_name= tool,
             fetched_at= fetched_at,
             duration_ms= duration,
@@ -74,11 +73,10 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
     duration = round((time.perf_counter() - start_time) * 1000)
     fetched_at = datetime.now(timezone.utc)
     total = get_total_from_header(response)
-    print(f"Response to check how to fetch tool id: {response}")
 
     status_code = response.status_code
     if status_code == 416:
-        return Result(meta=get_meta(tool_id="tool_id",returned=0, total_records=get_total_from_header(response)), data=[], status="SUCCESS")
+        return Result(meta=get_meta(returned=0, total_records=get_total_from_header(response)), data=[], status="SUCCESS")
     if status_code in (401, 403):
         return failed(ErrorCode.PERMISSION_DENIED, "Not allowed to read this data")
     if status_code == 400:
@@ -96,4 +94,4 @@ async def fetch(tool: str, model: type[BaseModel], table: str, filters: dict["st
         return failed(error_code=ErrorCode.NOT_FOUND, message= f"Couldn't find {model.__name__.lower()} with the given parameters")
 
     # Return the result
-    return Result(meta= get_meta(tool_id="tool_id",returned=len(rows), total_records= total), data=rows, status = "SUCCESS")
+    return Result(meta= get_meta(returned=len(rows), total_records= total), data=rows, status = "SUCCESS")

@@ -41,7 +41,6 @@ class LLMSecurityMiddleware(AgentMiddleware):
         try:
 
             security_assessment = await self.classifier.classify(user_message)
-            # print(f"security assessment: {security_assessment.model_dump()}")
 
             # read the assessment and pass the request accordingly
             if security_assessment.prompt_injection:
@@ -54,20 +53,20 @@ class LLMSecurityMiddleware(AgentMiddleware):
                 if security_assessment.action == "block":
                     return AIMessage(
                         content="I cannot process this request as it involves potentially unauthorised or harmful request",
-                        response_header = {"security_block": "harmful_content"}
+                        response_metadata = {"security_block": "harmful_content"}
                     )
 
                 if security_assessment.action == "review":
                     return AIMessage(
                         content="Need additional human review before proceeding with this request",
-                        response_header = {"security_block": "harmful_review"}
+                        response_metadata = {"security_block": "harmful_review"}
                     )
 
             if security_assessment.out_of_scope:
                 if security_assessment.action == "block":
                     return AIMessage(
                         content="I cannot process this request as it involves potentially unauthorised or harmful request",
-                        response_header = {"security_block": "out_of_scope"}
+                        response_metadata = {"security_block": "out_of_scope"}
                     )
 
             # Pass legitimate requests

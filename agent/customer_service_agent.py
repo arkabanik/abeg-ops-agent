@@ -54,16 +54,17 @@ async def run():
                 ID_FIELDS.add(name)
 
     def _tool_payload(message: ToolMessage) -> dict:
-
         artifact = message.artifact
-        if artifact and isinstance(artifact, dict):
-            if artifact["structured_content"] and isinstance(artifact["structured_content"], dict):
-                return artifact["structured_content"]
-
+        if isinstance(artifact, dict):
+            content = artifact.get("structured_content")
+            if isinstance(content, dict):
+                return content
         return {}
 
     def _status(message: BaseMessage | None, tool_calls: list[ToolCallInfo]) -> Status:
         if message is None:
+            return "FAILED"
+        if message.response_metadata.get("security_block"):
             return "FAILED"
         for toolcall in reversed(tool_calls):
             if toolcall.status == "FAILED":
@@ -75,10 +76,8 @@ async def run():
         for record in records:
             for field, value in record.items():
                 if field in ID_FIELDS:
-                    if isinstance(field, str):
+                    if isinstance(value, str):
                         ids.append(value)
-                    # if isinstance(value, list):
-                    #     ids.extend(_ids(v) for v in value)
         return ids
 
     def _usage_by_model(usage_meta: dict) -> dict[str,TokenUsageInfo]:
@@ -89,7 +88,6 @@ async def run():
         return usage_token_by_model
 
     def build_cached_result(*, output: str, t_id: str, t: int, source:Source, start_at: datetime, start: float):
-        print("inside Build cache result")
         return AgentResult(
             agent_meta=AgentRunMeta(
                 run_id=str(uuid.uuid4()),
@@ -106,45 +104,36 @@ async def run():
         )
 
     def build_agent_result(*, output_messages: list[BaseMessage], usage_meta: dict, t_id: str, t: int, source:Source, start_at: datetime, start: float):
-        # print("inside Build agent result")
         tool_list: list[ToolCallInfo] = []
-        data = []
+        record_ids: list[str] = []
         # Gather tool call info for each tool call
-        tool_payload: dict = {}
         for message in output_messages:
-            # print(f"Reading {type(message)}")
             if not isinstance(message, ToolMessage):
                 continue
 
             tool_payload = _tool_payload(message)
             if tool_payload:
                 meta = tool_payload.get("meta", {})
-                data = tool_payload.get("data", [])
+                record_ids.extend(_ids(tool_payload.get("data") or []))   # ← replaces  data = ...
                 status = tool_payload.get("status", "FAILED")
-
-                tool_list.append(ToolCallInfo(tool_id=message.tool_call_id,
+                tool_list.append(ToolCallInfo(tool_id=message.tool_call_id or None,
                                               tool_name=meta.get("tool_name",""),
-                                              duration_ms=meta.get("duration_ms", 0),
+                                              duration_ms=meta.get("duration_ms"),
                                               error_code=(tool_payload.get("error") or {}).get("code"),
-                                              returned=meta.get("returned", ""),
-                                              total=meta.get("total", 0),
+                                              returned=meta.get("returned"),
+                                              total=meta.get("total"),
                                               has_more=meta.get("has_more", False),
                                               status=status,))
 
         # Capture the final message to retrieve the output
         last_message: AIMessage | None = None
-        record_ids: list[str] = []
         for message in reversed(output_messages):
             if isinstance(message, AIMessage):
                 last_message = message
                 break
-            record_ids.extend(_ids(tool_payload.get("data") or []))
         text = last_message.content if last_message is not None and isinstance(last_message.content, str) else ""
         status = _status(message=last_message, tool_calls=tool_list)
-        # record_ids = _ids(data)
-
-
-
+        usage_by_model = _usage_by_model(usage_meta)
         return AgentResult(
             agent_meta=AgentRunMeta(
                 run_id=str(uuid.uuid4()),
@@ -154,8 +143,8 @@ async def run():
                 started_at=start_at,
                 duration_ms=int((time.perf_counter() - start) * 1000),
                 tools=tool_list,
-                usage_by_model=_usage_by_model(usage_meta),
-                total_token=sum(value.total_tokens for key, value in _usage_by_model(usage_meta).items())
+                usage_by_model=usage_by_model,
+                total_token=sum(value.total_tokens for value in usage_by_model.values())
             ),
             agent_output=AgentRunOutput(
                 output=text,
@@ -237,6 +226,7 @@ async def run():
                     print(f"Could not save to cache: {type(e).__name__}")
             turn = turn + 1
         except Exception as e:
+            turn = turn + 1
             print(f"Error: {e}")
 
 

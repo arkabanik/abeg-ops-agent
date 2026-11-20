@@ -20,7 +20,6 @@ class ErrorCode(str, Enum):
 RETRYABLE = {ErrorCode.UNAVAILABLE, ErrorCode.TIMEOUT, ErrorCode.UPSTREAM_ERROR}
 
 class ToolMeta(BaseModel):
-    tool_id: str
     tool_name: str
     schema_version: str = TOOL_SCHEMA_VERSION
     fetched_at: datetime
