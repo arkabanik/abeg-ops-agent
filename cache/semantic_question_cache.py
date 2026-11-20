@@ -7,6 +7,7 @@ from langchain_redis import RedisSemanticCache
 
 CACHE_VERSION = "_v1"
 
+
 class QuestionCache:
     """Caches the agent's FINAL answer, keyed by the user's question only.
 
@@ -19,7 +20,7 @@ class QuestionCache:
             redis_url=os.getenv("REDIS_URL", "redis://localhost:6379"),
             distance_threshold=distance_threshold,
             ttl=ttl,
-            prefix="abeg_question_cache"
+            prefix="abeg_question_cache",
         )
 
     @staticmethod
@@ -43,15 +44,6 @@ class QuestionCache:
 
     async def put(self, question: str, answer: str):
         normalized_q = self._normalize(question)
-        await self._cache.aupdate(prompt=normalized_q, llm_string=self._namespace(question), return_val = [Generation(text=answer)])
-
-
-
-
-
-
-
-
-
-
-
+        await self._cache.aupdate(
+            prompt=normalized_q, llm_string=self._namespace(question), return_val=[Generation(text=answer)]
+        )

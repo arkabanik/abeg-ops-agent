@@ -1,3 +1,4 @@
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -6,7 +7,7 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import PIIMiddleware
 from langchain.mcp import MCPAdapter
 from langchain_core.callbacks import get_usage_metadata_callback
-from langchain_core.messages import ToolMessage, HumanMessage, AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
 from cache.semantic_question_cache import QuestionCache
@@ -14,9 +15,8 @@ from guardrails.id_redaction_middleware import IdRedactionAgentMiddleware
 from guardrails.security_middleware import LLMSecurityMiddleware
 from llm.llm import get_llm, get_security_llm
 from prompts.system_prompt import SYSTEM_PROMPT
-import os
-from schemas.agent_result import AgentResult, AgentRunMeta, AgentRunOutput, Source, ToolCallInfo, Status, TokenUsageInfo
-from schemas.records import Order, Customer, sensitive_fields, Sensitivity
+from schemas.agent_result import AgentResult, AgentRunMeta, AgentRunOutput, Source, Status, TokenUsageInfo, ToolCallInfo
+from schemas.records import Customer, Order, Sensitivity, sensitive_fields
 
 
 async def run():
@@ -28,7 +28,7 @@ async def run():
     # This automatically manages the async stdio connection lifetime
     # Use MCPAdapter context manager to automatically start/stop the server
     # async with MCPAdapter(Path(__file__).parent.parent / "server.py") as adapter:
-    async with MCPAdapter(os.getenv("MCP_URL","http://127.0.0.1:9000/mcp")) as adapter:
+    async with MCPAdapter(os.getenv("MCP_URL", "http://127.0.0.1:9000/mcp")) as adapter:
         try:
             # Retrieve tools using the modern API method
             mcp_tools = await adapter.list_tools()
@@ -43,7 +43,7 @@ async def run():
 
     # configure_llm_cache()
     def new_conversation():
-        return 0, {"configurable": {"thread_id":str(uuid.uuid4())}}
+        return 0, {"configurable": {"thread_id": str(uuid.uuid4())}}
 
     ID_FIELDS = set()
 
@@ -80,14 +80,18 @@ async def run():
                         ids.append(value)
         return ids
 
-    def _usage_by_model(usage_meta: dict) -> dict[str,TokenUsageInfo]:
+    def _usage_by_model(usage_meta: dict) -> dict[str, TokenUsageInfo]:
         usage_token_by_model: dict[str, TokenUsageInfo] = {}
         for key, value in usage_meta.items():
             if isinstance(value, dict):
-                usage_token_by_model[key] = TokenUsageInfo(input_tokens=value.get("input_tokens", 0), output_tokens=value.get("output_tokens", 0), total_tokens=value.get("total_tokens", 0))
+                usage_token_by_model[key] = TokenUsageInfo(
+                    input_tokens=value.get("input_tokens", 0),
+                    output_tokens=value.get("output_tokens", 0),
+                    total_tokens=value.get("total_tokens", 0),
+                )
         return usage_token_by_model
 
-    def build_cached_result(*, output: str, t_id: str, t: int, source:Source, start_at: datetime, start: float):
+    def build_cached_result(*, output: str, t_id: str, t: int, source: Source, start_at: datetime, start: float):
         return AgentResult(
             agent_meta=AgentRunMeta(
                 run_id=str(uuid.uuid4()),
@@ -99,11 +103,20 @@ async def run():
             ),
             agent_output=AgentRunOutput(
                 output=output,
-                status="SUCCESS",       # only successful results are stored in cache
-            )
+                status="SUCCESS",  # only successful results are stored in cache
+            ),
         )
 
-    def build_agent_result(*, output_messages: list[BaseMessage], usage_meta: dict, t_id: str, t: int, source:Source, start_at: datetime, start: float):
+    def build_agent_result(
+        *,
+        output_messages: list[BaseMessage],
+        usage_meta: dict,
+        t_id: str,
+        t: int,
+        source: Source,
+        start_at: datetime,
+        start: float,
+    ):
         tool_list: list[ToolCallInfo] = []
         record_ids: list[str] = []
         # Gather tool call info for each tool call
@@ -116,14 +129,18 @@ async def run():
                 meta = tool_payload.get("meta", {})
                 record_ids.extend(_ids(tool_payload.get("data") or []))
                 status = tool_payload.get("status", "FAILED")
-                tool_list.append(ToolCallInfo(tool_id=message.tool_call_id or None,
-                                              tool_name=meta.get("tool_name",""),
-                                              duration_ms=meta.get("duration_ms"),
-                                              error_code=(tool_payload.get("error") or {}).get("code"),
-                                              returned=meta.get("returned"),
-                                              total=meta.get("total"),
-                                              has_more=meta.get("has_more", False),
-                                              status=status,))
+                tool_list.append(
+                    ToolCallInfo(
+                        tool_id=message.tool_call_id or None,
+                        tool_name=meta.get("tool_name", ""),
+                        duration_ms=meta.get("duration_ms"),
+                        error_code=(tool_payload.get("error") or {}).get("code"),
+                        returned=meta.get("returned"),
+                        total=meta.get("total"),
+                        has_more=meta.get("has_more", False),
+                        status=status,
+                    )
+                )
 
         # Capture the final message to retrieve the output
         last_message: AIMessage | None = None
@@ -144,14 +161,14 @@ async def run():
                 duration_ms=int((time.perf_counter() - start) * 1000),
                 tools=tool_list,
                 usage_by_model=usage_by_model,
-                total_token=sum(value.total_tokens for value in usage_by_model.values())
+                total_token=sum(value.total_tokens for value in usage_by_model.values()),
             ),
             agent_output=AgentRunOutput(
                 output=text,
                 status=status,
                 record_ids=list(dict.fromkeys(record_ids)),
-                has_more=any(t.has_more for t in tool_list)
-            )
+                has_more=any(t.has_more for t in tool_list),
+            ),
         )
 
     def show(result: AgentResult) -> None:
@@ -162,34 +179,37 @@ async def run():
 
     question_semantic_cache = QuestionCache(0.2, 600)
     agent = create_agent(
-        model = get_llm(),
-        tools = mcp_tools,
-        middleware = [
+        model=get_llm(),
+        tools=mcp_tools,
+        middleware=[
             IdRedactionAgentMiddleware(),
             LLMSecurityMiddleware(get_security_llm()),
-            PIIMiddleware("email", strategy="redact", apply_to_input=True, apply_to_output=True, apply_to_tool_results=True),
-            PIIMiddleware("credit_card",strategy="mask", apply_to_input=True, apply_to_output=True, apply_to_tool_results=True)
+            PIIMiddleware(
+                "email", strategy="redact", apply_to_input=True, apply_to_output=True, apply_to_tool_results=True
+            ),
+            PIIMiddleware(
+                "credit_card", strategy="mask", apply_to_input=True, apply_to_output=True, apply_to_tool_results=True
+            ),
         ],
-        system_prompt = SYSTEM_PROMPT,
-        checkpointer= InMemorySaver()
+        system_prompt=SYSTEM_PROMPT,
+        checkpointer=InMemorySaver(),
     )
-
 
     turn, config = new_conversation()
 
     while True:
         user_query = input("Enter your query (type 'new' to start a new conversation or type 'exit' to quit): ").strip()
 
-        if user_query.lower() in ('exit', 'quit'):
+        if user_query.lower() in ("exit", "quit"):
             return
 
-        if user_query.lower() == 'new':
+        if user_query.lower() == "new":
             turn, config = new_conversation()
             print("Started a new conversation")
             continue
 
         try:
-            #Look up cache to check if we have answered anything like this before?
+            # Look up cache to check if we have answered anything like this before?
             started_at, started = datetime.now(timezone.utc), time.perf_counter()
             thread_id = config["configurable"]["thread_id"]
             cached_answer: str | None = None
@@ -201,20 +221,30 @@ async def run():
                     cached_answer = None
 
                 if cached_answer:
-                    agent_run_result = build_cached_result(output=cached_answer, t_id=thread_id, t=turn, source="cache", start_at=started_at, start=started)
-                    show(agent_run_result)                      # ← add
-                    await agent.aupdate_state(config, {"messages": [HumanMessage(user_query), AIMessage(cached_answer)]})
+                    agent_run_result = build_cached_result(
+                        output=cached_answer, t_id=thread_id, t=turn, source="cache", start_at=started_at, start=started
+                    )
+                    show(agent_run_result)  # ← add
+                    await agent.aupdate_state(
+                        config, {"messages": [HumanMessage(user_query), AIMessage(cached_answer)]}
+                    )
                     turn += 1
                     continue
 
             # If no cache hit, run the full agent
             before = len((await agent.aget_state(config=config)).values.get("messages", []))
             with get_usage_metadata_callback() as usage:
-                response = await agent.ainvoke({"messages": [
-                    ("human", user_query)
-                ]}, config=config)
+                response = await agent.ainvoke({"messages": [("human", user_query)]}, config=config)
 
-            agent_run_result = build_agent_result(output_messages=response["messages"][before:], usage_meta=usage.usage_metadata, t_id=thread_id, t=turn, source="agent", start_at=started_at, start=started)
+            agent_run_result = build_agent_result(
+                output_messages=response["messages"][before:],
+                usage_meta=usage.usage_metadata,
+                t_id=thread_id,
+                t=turn,
+                source="agent",
+                start_at=started_at,
+                start=started,
+            )
 
             show(agent_run_result)
             output = agent_run_result.agent_output
@@ -228,6 +258,3 @@ async def run():
         except Exception as e:
             turn = turn + 1
             print(f"Error: {e}")
-
-
-

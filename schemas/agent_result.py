@@ -9,10 +9,12 @@ AGENT_SCHEMA_VERSION = "1.0"
 Source = Literal["agent", "cache"]
 Status = Literal["SUCCESS", "FAILED"]
 
+
 class TokenUsageInfo(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
+
 
 class ToolCallInfo(BaseModel):
     tool_id: str | None = None
@@ -23,6 +25,7 @@ class ToolCallInfo(BaseModel):
     total: int | None = None
     has_more: bool | None = None
     status: Status | None = None
+
 
 class AgentRunMeta(BaseModel):
     run_id: str
@@ -36,15 +39,14 @@ class AgentRunMeta(BaseModel):
     usage_by_model: dict[str, TokenUsageInfo] = Field(default_factory=dict)
     total_token: int = 0
 
+
 class AgentRunOutput(BaseModel):
     output: str | None
     status: Status
     record_ids: list[str] = Field(default_factory=list)
     has_more: bool = False
 
+
 class AgentResult(BaseModel):
     agent_meta: AgentRunMeta
     agent_output: AgentRunOutput
-
-
-

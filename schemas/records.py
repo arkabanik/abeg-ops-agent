@@ -3,7 +3,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Literal
 
-from pydantic import Field, BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Sensitivity(str, Enum):
@@ -11,11 +11,14 @@ class Sensitivity(str, Enum):
     PII = "pii"
     NONE = "none"
 
+
 def field(sensitivity: Sensitivity = Sensitivity.NONE, **kwargs):
     return Field(json_schema_extra={"x-sensitivity": sensitivity.value}, **kwargs)
 
+
 class Record(BaseModel):
     model_config = ConfigDict(extra="ignore")
+
 
 class CustomerContact(Record):
     customer_phone_number: str | None = field(Sensitivity.PII, default=None)
@@ -31,7 +34,7 @@ class Customer(Record):
     customer_status: Literal["ACTIVE", "INACTIVE", "BLOCKED"] = field()
     customer_type: Literal["Retail", "Media", "Ecomm"] | None = field(default=None)
     customer_joining_date: date = field()
-    customer_pii: list[CustomerContact] = field(default_factory=list)   # embedded from customer_pii
+    customer_pii: list[CustomerContact] = field(default_factory=list)  # embedded from customer_pii
 
 
 class Order(Record):
@@ -40,14 +43,25 @@ class Order(Record):
     order_type: Literal["STANDARD", "RETURN", "ADHOC"] = field()
     original_order_id: str | None = field(Sensitivity.IDENTIFIER, default=None)
     order_channel: Literal["WEBSITE", "INSTAGRAM", "WHATSAPP", "FACEBOOK", "RETAIL", "STALL"] = field()
-    order_status: Literal["PLACED", "CONFIRMED", "PACKED", "DISPATCHED", "OUT_FOR_DELIVERY", "DELIVERED",
-    "FULFILLED", "CANCELLED", "RETURN_INITIATED", "REPLACEMENT_INITIATED"] = field()
+    order_status: Literal[
+        "PLACED",
+        "CONFIRMED",
+        "PACKED",
+        "DISPATCHED",
+        "OUT_FOR_DELIVERY",
+        "DELIVERED",
+        "FULFILLED",
+        "CANCELLED",
+        "RETURN_INITIATED",
+        "REPLACEMENT_INITIATED",
+    ] = field()
     order_date_time: datetime = field()
     order_coupon_code: str | None = field(default=None)
     order_coupon_discount: Decimal = field()
     order_total_amount: Decimal | None = field(default=None)
     order_total_amount_currency: Literal["INR"] = field()
     contain_documents: bool = field()
+
 
 def select_for(model: type[BaseModel]) -> str:
     """Build PostgREST's ?select= from a model, so we fetch exactly the model's fields.
@@ -75,11 +89,3 @@ def sensitive_fields(model: type[BaseModel]) -> dict[str, str]:
         if isinstance(inner, type) and issubclass(inner, Record):
             out.update(sensitive_fields(inner))
     return out
-
-
-
-
-
-
-
-

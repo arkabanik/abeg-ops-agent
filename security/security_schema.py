@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, BaseModel
+from pydantic import BaseModel, Field
 
 
 class SecurityAssessment(BaseModel):
@@ -8,19 +8,7 @@ class SecurityAssessment(BaseModel):
     harmful_content: bool
     out_of_scope: bool
     category: str
-    severity: Literal[
-        "low",
-        "medium",
-        "high",
-        "critical"
-    ]
-    action: Literal[
-        "allow",
-        "review",
-        "block"
-    ]
-    confidence: float = Field(
-        ge=0.0,
-        le=1.0
-    )
+    severity: Literal["low", "medium", "high", "critical"]
+    action: Literal["allow", "review", "block"]
+    confidence: float = Field(ge=0.0, le=1.0)
     reason: str

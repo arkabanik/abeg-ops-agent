@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]          # every push, on any branch (a PR merge is a push to develop)
+  pull_request:               # also check PRs before they're merged
+
+permissions:
+  contents: read              # jobs can only read the repo
+
+concurrency:                  # a newer push cancels the older, still-running check
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install dev tools only
+        run: uv sync --locked --only-dev
+      - name: Lint
+        run: uv run --no-sync ruff check . --output-format=github
+      - name: Format check
+        run: uv run --no-sync ruff format --check .
+
+  typecheck:
+    name: Type check (mypy)
+    runs-on: ubuntu-latest
+    continue-on-error: true   # TEMPORARY: remove after the 8 errors are fixed (step 9)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install app + dev dependencies
+        run: uv sync --locked
+      - name: Type check
+        run: uv run --no-sync mypy .
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.30.0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # full history: a key deleted later is still in an old commit
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+      - name: Scan all commits
+        run: ./gitleaks git . --redact --no-banner -v
+      - name: Block committed .env files
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::A .env file is tracked by git. Remove it with: git rm --cached .env"
+            exit 1
+          fi
