@@ -6,12 +6,29 @@ from pathlib import Path
 
 LOG = Path("logs/agent_runs.jsonl")
 
+
 def main() -> None:
-    if not LOG.exists:
+    if not LOG.exists():
         print("No logs yet")
         return
 
-    runs = [json.loads(line) for line in LOG.read_text(encoding="utf-8").splitlines() if line.strip()]
+    runs: list[dict] = []
+    skipped = 0
+    for line in LOG.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:  # half-written or not JSON
+            skipped += 1
+            continue
+        if isinstance(record, dict) and "agent_meta" in record and "agent_output" in record:
+            runs.append(record)
+        else:  # e.g. old double-encoded lines (a string, not an object)
+            skipped += 1
+    if skipped:
+        print(f"Skipped {skipped} unreadable line(s)")
+
     if not runs:
         print("Log is empty")
         return
@@ -49,6 +66,7 @@ def main() -> None:
     print("\nTool failures:")
     for (tool, code), count in tool_errors.most_common() or [(("none", ""), 0)]:
         print(f"  {tool} {code}: {count}" if count else "  none")
+
 
 if __name__ == "__main__":
     main()
