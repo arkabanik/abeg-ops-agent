@@ -5,12 +5,16 @@ import os
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 LOG = Path(os.getenv("LOG_DIR", "logs")) / "agent_runs.jsonl"
 
 
 def main() -> None:
-    if not LOG.exists():
-        print("No logs yet")
+    load_dotenv()
+    log = Path(os.getenv("LOG_DIR", "logs")) / "agent_runs.jsonl"
+    if not log.exists():
+        print(f"No logs yet: {log}")
         return
 
     runs: list[dict] = []
