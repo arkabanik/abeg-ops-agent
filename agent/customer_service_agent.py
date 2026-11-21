@@ -237,7 +237,7 @@ async def run():
                     agent_run_result = build_cached_result(
                         output=cached_answer, t_id=thread_id, t=turn, source="cache", start_at=started_at, start=started
                     )
-                    show(agent_run_result)  # ← add
+                    show(agent_run_result)
                     log_run(agent_run_result)
                     await agent.aupdate_state(
                         config, {"messages": [HumanMessage(user_query), AIMessage(cached_answer)]}
