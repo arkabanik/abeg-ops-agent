@@ -181,7 +181,7 @@ async def run():
     agent_run_logger.propagate = False
 
     def log_run(result: AgentResult) -> None:
-        agent_meta_json = result.model_dump_json(exclude={"agent_output": {"output"}})
+        agent_meta_json = result.model_dump(mode="json", exclude={"agent_output": {"output"}})
         agent_run_logger.info(json.dumps(agent_meta_json))
 
     def show(result: AgentResult) -> None:
