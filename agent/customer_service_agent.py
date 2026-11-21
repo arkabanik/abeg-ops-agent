@@ -1,3 +1,5 @@
+import json
+import logging
 import os
 import time
 import uuid
@@ -171,6 +173,17 @@ async def run():
             ),
         )
 
+    os.makedirs("logs", exist_ok=True)
+    agent_run_logger = logging.getLogger("agent_run_logger")
+    if not agent_run_logger.handlers:
+        agent_run_logger.addHandler(logging.FileHandler(filename="logs/agent_runs.jsonl", encoding="utf-8"))
+    agent_run_logger.setLevel(logging.INFO)
+    agent_run_logger.propagate = False
+
+    def log_run(result: AgentResult) -> None:
+        agent_meta_json = result.model_dump_json(exclude={"agent_output": {"output"}})
+        agent_run_logger.info(json.dumps(agent_meta_json))
+
     def show(result: AgentResult) -> None:
         out, meta = result.agent_output, result.agent_meta
         tools = ", ".join(t.tool_name or "?" for t in meta.tools) or "none"
@@ -225,6 +238,7 @@ async def run():
                         output=cached_answer, t_id=thread_id, t=turn, source="cache", start_at=started_at, start=started
                     )
                     show(agent_run_result)  # ← add
+                    log_run(agent_run_result)
                     await agent.aupdate_state(
                         config, {"messages": [HumanMessage(user_query), AIMessage(cached_answer)]}
                     )
@@ -247,6 +261,7 @@ async def run():
             )
 
             show(agent_run_result)
+            log_run(agent_run_result)
             output = agent_run_result.agent_output
             found_rows = any((t.returned or 0) > 0 for t in agent_run_result.agent_meta.tools)
             if turn == 0 and output.status == "SUCCESS" and found_rows:
