@@ -1,10 +1,11 @@
 """Summarise logs/agent_runs.jsonl. Run: uv run python scripts/run_report.py"""
 
 import json
+import os
 from collections import Counter, defaultdict
 from pathlib import Path
 
-LOG = Path("logs/agent_runs.jsonl")
+LOG = Path(os.getenv("LOG_DIR", "logs")) / "agent_runs.jsonl"
 
 
 def main() -> None:
