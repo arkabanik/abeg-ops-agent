@@ -7,8 +7,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-LOG = Path(os.getenv("LOG_DIR", "logs")) / "agent_runs.jsonl"
-
 
 def main() -> None:
     load_dotenv()
@@ -19,7 +17,7 @@ def main() -> None:
 
     runs: list[dict] = []
     skipped = 0
-    for line in LOG.read_text(encoding="utf-8").splitlines():
+    for line in log.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         try:
