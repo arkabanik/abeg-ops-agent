@@ -24,7 +24,7 @@ def main() -> None:
             continue
         if isinstance(record, dict) and "agent_meta" in record and "agent_output" in record:
             runs.append(record)
-        else:  # e.g. old double-encoded lines (a string, not an object)
+        else:
             skipped += 1
     if skipped:
         print(f"Skipped {skipped} unreadable line(s)")

@@ -1,214 +1,20 @@
-import json
-import logging
-import os
-import time
-import uuid
-from datetime import datetime, timezone
+"""Terminal chat: reads questions, calls AgentService.answer(), prints the result."""
 
-from langchain.agents import create_agent
-from langchain.agents.middleware import PIIMiddleware
-from langchain.mcp import MCPAdapter
-from langchain_core.callbacks import get_usage_metadata_callback
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
-from langgraph.checkpoint.memory import InMemorySaver
-
-from cache.semantic_question_cache import QuestionCache
-from guardrails.id_redaction_middleware import IdRedactionAgentMiddleware
-from guardrails.security_middleware import LLMSecurityMiddleware
-from llm.llm import get_llm, get_security_llm
-from prompts.system_prompt import SYSTEM_PROMPT
-from schemas.agent_result import AgentResult, AgentRunMeta, AgentRunOutput, Source, Status, TokenUsageInfo, ToolCallInfo
-from schemas.records import Customer, Order, Sensitivity, sensitive_fields
+from agent.service import AgentService
+from schemas.agent_result import AgentResult
 
 
-async def run():
+def show(result: AgentResult) -> None:
+    out, meta = result.agent_output, result.agent_meta
+    tools = ", ".join(t.tool_name or "?" for t in meta.tools) or "none"
+    print(f"\nResponse: {out.output}")
+    print(f"[{out.status} · {meta.source} · {meta.duration_ms} ms · {meta.total_token} tokens · tools: {tools}]")
 
-    # Modern MCP Configuration Dictionary Structure
-    # Note: Transport key is no longer needed; it is inferred automatically from 'command'
-    print(f"Connecting to local MCP server via http transport... {os.getenv('MCP_URL')}")
-    # Load tools dynamically from the running MCP server
-    # This automatically manages the async stdio connection lifetime
-    # Use MCPAdapter context manager to automatically start/stop the server
-    # async with MCPAdapter(Path(__file__).parent.parent / "server.py") as adapter:
-    async with MCPAdapter(os.getenv("MCP_URL", "http://127.0.0.1:9000/mcp")) as adapter:
-        try:
-            # Retrieve tools using the modern API method
-            mcp_tools = await adapter.list_tools()
-            print(f"Successfully loaded {len(mcp_tools)} tools from MCP server.")
 
-            for tool in mcp_tools:
-                print(f"{tool.name} : {tool.description}")
-
-        except Exception as e:
-            print(f"Failed to extract tools from adapter: {e}")
-            return
-
-    # configure_llm_cache()
-    def new_conversation():
-        return 0, {"configurable": {"thread_id": str(uuid.uuid4())}}
-
-    ID_FIELDS = set()
-
-    for model in (Customer, Order):
-        fields = sensitive_fields(model)
-        for name, tag in fields.items():
-            if tag == Sensitivity.IDENTIFIER.value:
-                ID_FIELDS.add(name)
-
-    def _tool_payload(message: ToolMessage) -> dict:
-        artifact = message.artifact
-        if isinstance(artifact, dict):
-            content = artifact.get("structured_content")
-            if isinstance(content, dict):
-                return content
-        return {}
-
-    def _status(message: BaseMessage | None, tool_calls: list[ToolCallInfo]) -> Status:
-        if message is None:
-            return "FAILED"
-        if message.response_metadata.get("security_block"):
-            return "FAILED"
-        for toolcall in reversed(tool_calls):
-            if toolcall.status == "FAILED":
-                return "FAILED"
-        return "SUCCESS"
-
-    def _ids(records: list[dict]) -> list[str]:
-        ids = []
-        for record in records:
-            for field, value in record.items():
-                if field in ID_FIELDS:
-                    if isinstance(value, str):
-                        ids.append(value)
-        return ids
-
-    def _usage_by_model(usage_meta: dict) -> dict[str, TokenUsageInfo]:
-        usage_token_by_model: dict[str, TokenUsageInfo] = {}
-        for key, value in usage_meta.items():
-            if isinstance(value, dict):
-                usage_token_by_model[key] = TokenUsageInfo(
-                    input_tokens=value.get("input_tokens", 0),
-                    output_tokens=value.get("output_tokens", 0),
-                    total_tokens=value.get("total_tokens", 0),
-                )
-        return usage_token_by_model
-
-    def build_cached_result(*, output: str, t_id: str, t: int, source: Source, start_at: datetime, start: float):
-        return AgentResult(
-            agent_meta=AgentRunMeta(
-                run_id=str(uuid.uuid4()),
-                thread_id=t_id,
-                turn=t,
-                source=source,
-                started_at=start_at,
-                duration_ms=int((time.perf_counter() - start) * 1000),
-            ),
-            agent_output=AgentRunOutput(
-                output=output,
-                status="SUCCESS",  # only successful results are stored in cache
-            ),
-        )
-
-    def build_agent_result(
-        *,
-        output_messages: list[BaseMessage],
-        usage_meta: dict,
-        t_id: str,
-        t: int,
-        source: Source,
-        start_at: datetime,
-        start: float,
-    ):
-        tool_list: list[ToolCallInfo] = []
-        record_ids: list[str] = []
-        # Gather tool call info for each tool call
-        for message in output_messages:
-            if not isinstance(message, ToolMessage):
-                continue
-
-            tool_payload = _tool_payload(message)
-            if tool_payload:
-                meta = tool_payload.get("meta", {})
-                record_ids.extend(_ids(tool_payload.get("data") or []))
-                status = tool_payload.get("status", "FAILED")
-                tool_list.append(
-                    ToolCallInfo(
-                        tool_id=message.tool_call_id or None,
-                        tool_name=meta.get("tool_name", ""),
-                        duration_ms=meta.get("duration_ms"),
-                        error_code=(tool_payload.get("error") or {}).get("code"),
-                        returned=meta.get("returned"),
-                        total=meta.get("total"),
-                        has_more=meta.get("has_more", False),
-                        status=status,
-                    )
-                )
-
-        # Capture the final message to retrieve the output
-        last_message: AIMessage | None = None
-        for message in reversed(output_messages):
-            if isinstance(message, AIMessage):
-                last_message = message
-                break
-        text = last_message.content if last_message is not None and isinstance(last_message.content, str) else ""
-        status = _status(message=last_message, tool_calls=tool_list)
-        usage_by_model = _usage_by_model(usage_meta)
-        return AgentResult(
-            agent_meta=AgentRunMeta(
-                run_id=str(uuid.uuid4()),
-                thread_id=t_id,
-                turn=t,
-                source=source,
-                started_at=start_at,
-                duration_ms=int((time.perf_counter() - start) * 1000),
-                tools=tool_list,
-                usage_by_model=usage_by_model,
-                total_token=sum(value.total_tokens for value in usage_by_model.values()),
-            ),
-            agent_output=AgentRunOutput(
-                output=text,
-                status=status,
-                record_ids=list(dict.fromkeys(record_ids)),
-                has_more=any(t.has_more for t in tool_list),
-            ),
-        )
-
-    os.makedirs("logs", exist_ok=True)
-    agent_run_logger = logging.getLogger("agent_run_logger")
-    if not agent_run_logger.handlers:
-        agent_run_logger.addHandler(logging.FileHandler(filename="logs/agent_runs.jsonl", encoding="utf-8"))
-    agent_run_logger.setLevel(logging.INFO)
-    agent_run_logger.propagate = False
-
-    def log_run(result: AgentResult) -> None:
-        agent_meta_json = result.model_dump(mode="json", exclude={"agent_output": {"output"}})
-        agent_run_logger.info(json.dumps(agent_meta_json))
-
-    def show(result: AgentResult) -> None:
-        out, meta = result.agent_output, result.agent_meta
-        tools = ", ".join(t.tool_name or "?" for t in meta.tools) or "none"
-        print(f"\nResponse: {out.output}")
-        print(f"[{out.status} · {meta.source} · {meta.duration_ms} ms · {meta.total_token} tokens · tools: {tools}]")
-
-    question_semantic_cache = QuestionCache(0.2, 600)
-    agent = create_agent(
-        model=get_llm(),
-        tools=mcp_tools,
-        middleware=[
-            IdRedactionAgentMiddleware(),
-            LLMSecurityMiddleware(get_security_llm()),
-            PIIMiddleware(
-                "email", strategy="redact", apply_to_input=True, apply_to_output=True, apply_to_tool_results=True
-            ),
-            PIIMiddleware(
-                "credit_card", strategy="mask", apply_to_input=True, apply_to_output=True, apply_to_tool_results=True
-            ),
-        ],
-        system_prompt=SYSTEM_PROMPT,
-        checkpointer=InMemorySaver(),
-    )
-
-    turn, config = new_conversation()
+async def run() -> None:
+    service = AgentService()
+    await service.start()
+    thread_id = service.new_conversation()
 
     while True:
         user_query = input("Enter your query (type 'new' to start a new conversation or type 'exit' to quit): ").strip()
@@ -217,59 +23,9 @@ async def run():
             return
 
         if user_query.lower() == "new":
-            turn, config = new_conversation()
+            thread_id = service.new_conversation()
             print("Started a new conversation")
             continue
 
-        try:
-            # Look up cache to check if we have answered anything like this before?
-            started_at, started = datetime.now(timezone.utc), time.perf_counter()
-            thread_id = config["configurable"]["thread_id"]
-            cached_answer: str | None = None
-            if turn == 0:
-                try:
-                    cached_answer = await question_semantic_cache.get(user_query)
-                except Exception as e:
-                    print(f"Cache unavailable, continuing without it: {type(e).__name__}")
-                    cached_answer = None
-
-                if cached_answer:
-                    agent_run_result = build_cached_result(
-                        output=cached_answer, t_id=thread_id, t=turn, source="cache", start_at=started_at, start=started
-                    )
-                    show(agent_run_result)
-                    log_run(agent_run_result)
-                    await agent.aupdate_state(
-                        config, {"messages": [HumanMessage(user_query), AIMessage(cached_answer)]}
-                    )
-                    turn += 1
-                    continue
-
-            # If no cache hit, run the full agent
-            before = len((await agent.aget_state(config=config)).values.get("messages", []))
-            with get_usage_metadata_callback() as usage:
-                response = await agent.ainvoke({"messages": [HumanMessage(user_query)]}, config=config)
-
-            agent_run_result = build_agent_result(
-                output_messages=response["messages"][before:],
-                usage_meta=usage.usage_metadata,
-                t_id=thread_id,
-                t=turn,
-                source="agent",
-                start_at=started_at,
-                start=started,
-            )
-
-            show(agent_run_result)
-            log_run(agent_run_result)
-            output = agent_run_result.agent_output
-            found_rows = any((t.returned or 0) > 0 for t in agent_run_result.agent_meta.tools)
-            if turn == 0 and output.status == "SUCCESS" and found_rows:
-                try:
-                    await question_semantic_cache.put(user_query, output.output)
-                except Exception as e:
-                    print(f"Could not save to cache: {type(e).__name__}")
-            turn = turn + 1
-        except Exception as e:
-            turn = turn + 1
-            print(f"Error: {e}")
+        if user_query:
+            show(await service.answer(thread_id, user_query))
