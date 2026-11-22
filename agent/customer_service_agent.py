@@ -1,4 +1,5 @@
-"""Terminal chat: reads questions, calls AgentService.answer(), prints the result."""
+"""Terminal chat: reads questions, calls AgenticService.answer(), prints the result."""
+
 from agent.agent_service import AgenticService
 from schemas.agent_result import AgentResult
 

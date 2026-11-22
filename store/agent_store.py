@@ -11,25 +11,25 @@ from schemas.agent_result import AgentResult
 SCHEMA = [
     """
     CREATE TABLE IF NOT EXISTS conversations (
-                                                 thread_id  TEXT PRIMARY KEY,
-                                                 user_id    TEXT NOT NULL,
-                                                 title      TEXT NOT NULL DEFAULT 'New chat',
-                                                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        thread_id  TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL,
+        title      TEXT NOT NULL DEFAULT 'New chat',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-        )
+    )
     """,
     "CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations (user_id, updated_at DESC)",
     """
     CREATE TABLE IF NOT EXISTS agent_runs (
-                                              run_id     TEXT PRIMARY KEY,
-                                              thread_id  TEXT NOT NULL REFERENCES conversations (thread_id) ON DELETE CASCADE,
+        run_id     TEXT PRIMARY KEY,
+        thread_id  TEXT NOT NULL REFERENCES conversations (thread_id) ON DELETE CASCADE,
         user_id    TEXT NOT NULL,
         turn       INTEGER NOT NULL,
         status     TEXT NOT NULL,
         source     TEXT NOT NULL,
         started_at TIMESTAMPTZ NOT NULL,
         result     JSONB NOT NULL  -- AgentResult WITHOUT the answer text
-        )
+    )
     """,
     "CREATE INDEX IF NOT EXISTS idx_runs_thread ON agent_runs (thread_id, turn)",
 ]
@@ -91,7 +91,8 @@ class AgentStore:
         meta = result.agent_meta
         async with self.pool.connection() as conn:
             await conn.execute(
-                "INSERT INTO agent_runs (run_id, thread_id, user_id, turn, status, source, started_at, result) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                "INSERT INTO agent_runs (run_id, thread_id, user_id, turn, status, source, started_at, result) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     meta.run_id,
                     meta.thread_id,

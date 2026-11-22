@@ -5,7 +5,6 @@ description = "ABEG internal ops assistant: LangChain agent with MCP tools over 
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "agentservice>=0.0.144",
     "fastapi>=0.165.0",
     "fastmcp>=4.1.8",
     "httpx>=0.28.1",

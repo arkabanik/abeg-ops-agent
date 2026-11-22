@@ -11,7 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from agent.agent_service import AgenticService, ConversationNotFound, ConversationBusy
+from agent.agent_service import AgenticService, ConversationBusy, ConversationNotFound
 from schemas.agent_result import AgentResult
 
 logging.basicConfig(level=logging.INFO)

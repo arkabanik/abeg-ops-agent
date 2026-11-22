@@ -51,7 +51,7 @@ class AgenticService:
     # ---------- conversations ----------
     def _store(self) -> AgentStore:
         if self.store is None:
-            raise RuntimeError("AgentService.start() was not called")
+            raise RuntimeError("AgenticService.start() was not called")
         return self.store
 
     async def new_conversation(self, user_id: str) -> dict:
@@ -133,7 +133,7 @@ class AgenticService:
                 try:
                     cached_answer = await self.cache.get(question)
                 except Exception as e:
-                    log.warning(f"Cache unavailable, continuing without it: {type(e).__name__}")
+                    log.warning("Cache unavailable, continuing without it: %s", type(e).__name__)
                 if cached_answer:
                     result = build_cached_result(
                         output=cached_answer,
@@ -176,7 +176,7 @@ class AgenticService:
             try:
                 await self.cache.put(question, output.output or "")
             except Exception as e:
-                log.warning(f"Could not save to cache: {type(e).__name__}")
+                log.warning("Could not save to cache: %s", type(e).__name__)
         return result
 
     async def start(self) -> None:
