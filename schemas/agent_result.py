@@ -31,6 +31,7 @@ class AgentRunMeta(BaseModel):
     run_id: str
     thread_id: str
     schema_version: str = AGENT_SCHEMA_VERSION
+    user_id: str
     turn: int
     source: Source
     started_at: datetime

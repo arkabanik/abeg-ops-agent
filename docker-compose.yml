@@ -8,15 +8,18 @@ services:
       POSTGRES_DB: app_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgrespass
+      AGENT_DB_PASSWORD: ${AGENT_DB_PASSWORD:?set AGENT_DB_PASSWORD in .env}
     volumes:
       # Automatically runs the SQL script on initial startup
       - ./init_datasource.sql:/docker-entrypoint-initdb.d/init_datasource.sql
+      - ./docker/initdb/20_agent_app.sh:/docker-entrypoint-initdb.d/20_agent_app.sh:ro
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
+
 
   postgrest:
     image: postgrest/postgrest:v12.2.0
