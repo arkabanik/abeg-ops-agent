@@ -60,11 +60,14 @@ def _usage_by_model(usage_meta: dict) -> dict[str, TokenUsageInfo]:
     return usage_token_by_model
 
 
-def build_cached_result(*, output: str, t_id: str, t: int, source: Source, start_at: datetime, start: float):
+def build_cached_result(
+    *, output: str, t_id: str, user_id: str, t: int, source: Source, start_at: datetime, start: float
+):
     return AgentResult(
         agent_meta=AgentRunMeta(
             run_id=str(uuid.uuid4()),
             thread_id=t_id,
+            user_id=user_id,
             turn=t,
             source=source,
             started_at=start_at,
@@ -82,6 +85,7 @@ def build_agent_result(
     output_messages: list[BaseMessage],
     usage_meta: dict,
     t_id: str,
+    user_id: str,
     t: int,
     source: Source,
     start_at: datetime,
@@ -125,6 +129,7 @@ def build_agent_result(
         agent_meta=AgentRunMeta(
             run_id=str(uuid.uuid4()),
             thread_id=t_id,
+            user_id=user_id,
             turn=t,
             source=source,
             started_at=start_at,
@@ -142,13 +147,14 @@ def build_agent_result(
     )
 
 
-def build_error_result(*, t_id: str, t: int, start_at: datetime, start: float) -> AgentResult:
+def build_error_result(*, t_id: str, user_id: str, t: int, start_at: datetime, start: float) -> AgentResult:
     """Used when a run crashes: a FAILED result with a friendly message instead of a Python error."""
     run_id = str(uuid.uuid4())
     return AgentResult(
         agent_meta=AgentRunMeta(
             run_id=run_id,
             thread_id=t_id,
+            user_id=user_id,
             turn=t,
             source="agent",
             started_at=start_at,
